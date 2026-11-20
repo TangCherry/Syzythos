@@ -34,6 +34,7 @@
   const INVENTORY_KEY = 'muscules_neo_inventory_v01';
   const CURRENT_ENCOUNTER_KEY = 'muscules_dynamic_current_encounter_v01';
   const read = key => { try { return JSON.parse(storage.getItem(key)) } catch { return null } };
+  class BattleStorageError extends Error {}
   const ITEM_POOL = ['bola', 'llave', 'totem', 'encendedor', 'ojo', 'maaaake', 'fuego', 'gatito', 'stirfry', 'miau', 'morision', 'cumbia', 'galleta', 'sherma', 'gusanito'];
   const ITEMS = {
     bola: ['Bola de cristal', 'bola-de-cristal.png', 'bola de cristal.png', 'roll_bonus', 1],
@@ -100,6 +101,36 @@
   const BATTLE_PREFIX = 'muscules_dynamic_battle_v02_';
   const DURATION = 24 * 60 * 60 * 1000;
   const CATALOG = window.MUSCULES_ENEMIES || [];
+  function readBattle(key) {
+    let raw;
+    try {
+      raw = storage.getItem(key);
+    } catch (error) {
+      throw new BattleStorageError('No se pudo leer el estado guardado del combate. No se modificaron los datos.', { cause: error });
+    }
+    if (raw === null) return null;
+
+    let stored;
+    try {
+      stored = JSON.parse(raw);
+    } catch (error) {
+      throw new BattleStorageError('El estado guardado del combate tiene JSON inválido. No se modificaron los datos.', { cause: error });
+    }
+    const expectedEnemyId = key.startsWith(BATTLE_PREFIX) ? key.slice(BATTLE_PREFIX.length) : null;
+    if (!stored || typeof stored !== 'object' || Array.isArray(stored)
+      || !expectedEnemyId || stored.enemyId !== expectedEnemyId
+      || !Number.isFinite(stored.enemyHp) || stored.enemyHp < 0
+      || !Number.isSafeInteger(stored.round) || stored.round < 0
+      || !['active', 'won', 'lost'].includes(stored.status)
+      || (stored.encounterId != null && typeof stored.encounterId !== 'string')
+      || (stored.heroHp !== undefined && !Number.isFinite(stored.heroHp))
+      || (stored.startedAt !== undefined && !Number.isFinite(stored.startedAt))
+      || (stored.expiresAt !== undefined && !Number.isFinite(stored.expiresAt))
+      || (stored.claimed !== undefined && typeof stored.claimed !== 'boolean')) {
+      throw new BattleStorageError('El estado guardado del combate está incompleto o tiene un formato inválido. No se modificaron los datos.');
+    }
+    return stored;
+  }
   const requestedEncounterId = qaMode ? null : new URLSearchParams(location.search).get('encounter');
   const save = (key, value) => storage.setItem(key, JSON.stringify(value));
   const roll = () => Math.floor(Math.random() * 20) + 1;
@@ -118,6 +149,7 @@
   renderHeroTitle();
   let statsLockDepth = 0;
   let statsTransaction = null;
+  let battleStorageError = null;
   let selectedId = 'carrotnero';
   let enemy, battle, battleKey, activeEncounter = null;
   function createEncounterId() { return `${Date.now()}-${Math.random().toString(36).slice(2)}`; }
@@ -178,10 +210,14 @@
     const pointer = read(CURRENT_ENCOUNTER_KEY);
     if (pointer?.enemyId !== selectedId || pointer?.encounterId !== battle.encounterId) return;
     activeEncounter = pointer;
-    const latest = read(battleKey);
+    const latest = readBattle(battleKey);
+    if (!latest) {
+      throw new BattleStorageError('No se encontró el estado guardado de esta pelea. No se modificaron los datos.');
+    }
     if (latest?.encounterId === battle.encounterId) battle = latest;
   }
   function runWithStatsLock(task) {
+    if (battleStorageError) return Promise.resolve(false);
     if (statsLockDepth) return task();
     const encounterIdAtStart = battle?.encounterId;
     if (!statsStore.supportsLock()) {
@@ -214,7 +250,7 @@
         statsTransaction = null;
       }
     }).catch(error => {
-      reportLockError(error);
+      if (!showBattleStorageError(error)) reportLockError(error);
       return false;
     });
   }
@@ -244,7 +280,7 @@
   function discardPendingReward(pointer) {
     if (!pointer?.enemyId || !pointer.encounterId) return;
     const previousKey = BATTLE_PREFIX + pointer.enemyId;
-    const previousBattle = read(previousKey);
+    const previousBattle = readBattle(previousKey);
     if (previousBattle?.encounterId !== pointer.encounterId
       || previousBattle.status !== 'won' || previousBattle.claimed) return;
     previousBattle.rewardDiscarded = true;
@@ -277,7 +313,7 @@
     closeInventory();
     if (qaMode && startNewEncounter) discardPendingReward(pointer);
     activeEncounter = qaMode ? null : pointer;
-    const storedBattle = read(battleKey);
+    const storedBattle = readBattle(battleKey);
     const pointerMatchesEnemy = pointer?.enemyId === id;
     const battleMatchesPointer = pointerMatchesEnemy && storedBattle?.encounterId
       && storedBattle.encounterId === pointer.encounterId;
@@ -311,6 +347,8 @@
       }
     } else {
       battle = battleMatchesPointer ? storedBattle : freshBattle(pointer);
+      // Activation stores the pointer before the first battle load. A missing key
+      // is therefore indistinguishable from a previously deleted battle.
       if (!battleMatchesPointer) save(battleKey, battle);
     }
     // Compatibilidad con encuentros creados antes de introducir openingApplied:
@@ -479,9 +517,24 @@
       history.replaceState(null, '', location.pathname);
     }
   }
+  function showBattleStorageError(error) {
+    if (!(error instanceof BattleStorageError)) return false;
+    battleStorageError = error.message;
+    showNoEncounter(battleStorageError);
+    for (const id of ['roll', 'inventory-toggle', 'inventory-apply', 'claim', 'revive-button', 'reset', 'enemy-select']) {
+      const control = $(id);
+      if (control) control.disabled = true;
+    }
+    return true;
+  }
   function deactivateEncounter() {
     if (!qaMode) return;
-    discardPendingReward(read(CURRENT_ENCOUNTER_KEY));
+    try {
+      discardPendingReward(read(CURRENT_ENCOUNTER_KEY));
+    } catch (error) {
+      if (!showBattleStorageError(error)) reportLockError(error);
+      return;
+    }
     storage.removeItem(CURRENT_ENCOUNTER_KEY);
     showNoEncounter();
   }
@@ -700,8 +753,11 @@
       return;
     }
     if (battle.rewardDiscarded) { render(); return; }
-    const latestBattle = read(battleKey);
-    if (!latestBattle || latestBattle.encounterId !== battle.encounterId || latestBattle.claimed || latestBattle.rewardDiscarded) {
+    const latestBattle = readBattle(battleKey);
+    if (!latestBattle) {
+      throw new BattleStorageError('No se encontró el estado guardado de esta pelea. No se modificaron los datos.');
+    }
+    if (latestBattle.encounterId !== battle.encounterId || latestBattle.claimed || latestBattle.rewardDiscarded) {
       loadEnemy(pointer.enemyId);
       return;
     }
@@ -751,10 +807,17 @@
       }
     }
     if (event.key === battleKey && battle?.encounterId) {
-      const latestBattle = read(battleKey);
-      if (latestBattle?.encounterId === battle.encounterId) {
-        battle = latestBattle;
-        render();
+      try {
+        const latestBattle = readBattle(battleKey);
+        if (!latestBattle) {
+          throw new BattleStorageError('No se encontró el estado guardado de esta pelea. No se modificaron los datos.');
+        }
+        if (latestBattle.encounterId === battle.encounterId) {
+          battle = latestBattle;
+          render();
+        }
+      } catch (error) {
+        if (!showBattleStorageError(error)) reportLockError(error);
       }
     }
     if (event.key === INVENTORY_KEY) {
@@ -784,13 +847,26 @@
       }
       if (CATALOG.some(e => e.id === pointer?.enemyId) && pointer.encounterId) {
         if (previousPointer && (previousPointer.enemyId !== pointer.enemyId
-          || previousPointer.encounterId !== pointer.encounterId)) discardPendingReward(previousPointer);
+          || previousPointer.encounterId !== pointer.encounterId)) {
+          try {
+            discardPendingReward(previousPointer);
+          } catch (error) {
+            if (!showBattleStorageError(error)) reportLockError(error);
+            return;
+          }
+        }
         if (!battle || pointer.enemyId !== enemy?.id || pointer.encounterId !== battle.encounterId) {
           loadEnemy(pointer.enemyId);
         }
       } else {
-        const previousBattle = previousPointer?.enemyId
-          ? read(BATTLE_PREFIX + previousPointer.enemyId) : null;
+        let previousBattle = null;
+        try {
+          previousBattle = previousPointer?.enemyId
+            ? readBattle(BATTLE_PREFIX + previousPointer.enemyId) : null;
+        } catch (error) {
+          if (!showBattleStorageError(error)) reportLockError(error);
+          return;
+        }
         if (previousBattle?.encounterId === previousPointer?.encounterId
           && previousBattle.status === 'won' && !previousBattle.claimed && !previousBattle.rewardDiscarded) {
           save(CURRENT_ENCOUNTER_KEY, previousPointer);
