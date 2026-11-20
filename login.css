@@ -1,0 +1,233 @@
+@import url('https://fonts.googleapis.com/css2?family=MedievalSharp&display=swap');
+
+.login-page,
+.login-page * {
+  box-sizing: border-box;
+}
+
+.auth-page.login-page {
+  min-height: 100svh;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow-x: hidden;
+  overflow-y: auto;
+  background: #100d19;
+  font-family: 'MedievalSharp', Georgia, serif;
+}
+
+.login-portal {
+  position: relative;
+  flex: 0 0 auto;
+  width: min(100%, 393px);
+  height: min(100dvh, 852px);
+  min-height: 700px;
+  max-height: 852px;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background: #49353c;
+  box-shadow: none;
+  color: #fff;
+}
+
+.login-portal::before {
+  position: absolute;
+  z-index: 0;
+  inset: 19px;
+  background: #100d19 url('assets/login-fondo.jpeg') center center / cover no-repeat;
+  content: "";
+  pointer-events: none;
+}
+
+.login-frame {
+  position: absolute;
+  z-index: 4;
+  inset: 0;
+  pointer-events: none;
+}
+
+.login-star {
+  position: absolute;
+  width: 41px;
+  height: 41px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 2px #ffcf69);
+}
+
+.login-star--tl {
+  top: -1px;
+  left: -1px;
+}
+
+.login-star--tr {
+  top: -1px;
+  right: -1px;
+  transform: scaleX(-1);
+}
+
+.login-star--bl {
+  bottom: -1px;
+  left: -1px;
+  transform: scaleY(-1);
+}
+
+.login-star--br {
+  right: -1px;
+  bottom: -1px;
+  transform: rotate(180deg);
+}
+
+.login-heading {
+  position: absolute;
+  z-index: 2;
+  top: 4.8%;
+  left: 8%;
+  width: 84%;
+  margin: 0;
+  color: #fff;
+  font-size: clamp(25px, 7vw, 29px);
+  font-weight: 400;
+  line-height: 1.18;
+  text-align: center;
+  text-shadow: 2px 3px 2px #080710;
+}
+
+.login-form {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  display: block;
+  width: auto;
+  margin: 0;
+}
+
+.login-field {
+  position: absolute;
+  left: 10.2%;
+  display: grid;
+  width: 81.6%;
+  gap: 12px;
+}
+
+.login-field--email {
+  top: 42.9%;
+}
+
+.login-field--password {
+  top: 53.4%;
+}
+
+.login-field label {
+  color: #fff;
+  font-size: clamp(21px, 5.8vw, 24px);
+  line-height: 1.15;
+  text-shadow: 2px 2px 2px #080710;
+}
+
+.login-field input {
+  width: 100%;
+  min-height: 44px;
+  padding: 7px 10px;
+  border: 1px solid rgb(255 255 255 / 55%);
+  border-radius: 5px;
+  outline-color: #b7efac;
+  background: rgb(255 255 255 / 74%);
+  color: #241a20;
+  font: 16px system-ui, sans-serif;
+}
+
+.login-form > button {
+  position: absolute;
+  top: 69.4%;
+  left: 50%;
+  width: min(50%, 220px);
+  min-height: 48px;
+  margin: 0;
+  padding: 8px 12px;
+  border: 2px solid #165e22;
+  border-radius: 7px;
+  background: #269b35;
+  box-shadow: 0 3px 0 #123f1b;
+  color: #fff;
+  cursor: pointer;
+  font: 700 clamp(13px, 3.8vw, 16px) 'MedievalSharp', Georgia, serif;
+  line-height: 1.1;
+  text-shadow: 1px 1px 1px #16431e;
+  transform: translateX(-50%);
+}
+
+.login-form > button:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.login-status {
+  position: absolute;
+  z-index: 2;
+  top: 77%;
+  left: 8%;
+  width: 84%;
+  min-height: 1.4em;
+  margin: 0;
+  color: #e7ffe3;
+  font: 14px/1.3 system-ui, sans-serif;
+  text-align: center;
+  text-shadow: 1px 1px 2px #100d19;
+}
+
+.login-status.is-error {
+  color: #ffd9d9;
+}
+
+.login-swords {
+  position: absolute;
+  z-index: 2;
+  bottom: 5%;
+  left: 50%;
+  width: 54px;
+  height: 54px;
+  object-fit: contain;
+  transform: translateX(-50%);
+}
+
+.login-active-session {
+  position: absolute;
+  z-index: 2;
+  top: 39%;
+  left: 10%;
+  width: 80%;
+  padding: 18px;
+  border: 1px solid rgb(255 255 255 / 42%);
+  border-radius: 8px;
+  background: rgb(31 22 35 / 86%);
+  text-align: center;
+}
+
+.login-active-session[hidden] {
+  display: none;
+}
+
+.login-active-session .auth-button {
+  display: grid;
+  align-items: center;
+  min-height: 48px;
+  padding: 9px;
+  font-family: 'MedievalSharp', Georgia, serif;
+}
+
+.login-page .auth-status {
+  color: #e7ffe3;
+}
+
+.login-page .auth-status.is-error {
+  color: #ffd9d9;
+}
+
+@media (max-height: 720px) {
+  .auth-page.login-page {
+    align-items: flex-start;
+  }
+}

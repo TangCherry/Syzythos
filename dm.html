@@ -6,9 +6,16 @@
   <meta name="theme-color" content="#42303a">
   <title>Muscules | Dungeon Master</title>
   <link rel="stylesheet" href="dm.css">
+  <link rel="stylesheet" href="auth.css">
+  <link rel="stylesheet" href="home-auth.css">
+  <script src="supabase-config.js"></script>
 </head>
-<body>
+<body data-auth-required="dm">
   <main class="dm-screen dm-screen--home" aria-label="Panel de Cherry">
+    <button class="home-signout" type="button" data-auth-signout aria-label="Cerrar sesión" aria-describedby="home-signout-error">
+      <img src="assets/exit.png" alt="">
+    </button>
+    <p id="home-signout-error" class="home-signout-error" data-auth-signout-error role="alert" hidden></p>
     <img class="dm-star dm-star--tl" src="assets/sparkle.png" alt="">
     <img class="dm-star dm-star--tr" src="assets/sparkle.png" alt="">
     <img class="dm-star dm-star--bl" src="assets/sparkle.png" alt="">
@@ -33,5 +40,6 @@
       </a>
     </nav>
   </main>
+  <script type="module" src="auth-guard.js"></script>
 </body>
 </html>

@@ -6,9 +6,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Muscules | Inventario de Neo</title>
     <link rel="stylesheet" href="inventario.css">
+    <link rel="stylesheet" href="auth.css">
+    <script src="supabase-config.js"></script>
 </head>
 
-<body>
+<body data-auth-required="session">
     <main class="inventory-screen">
         <div class="inventory-frame">
             <a class="back" href="index.html" aria-label="Volver al inicio">← <span>Atrás</span></a>
@@ -58,6 +60,7 @@
     <script src="neo-stats-lock.js"></script>
     <script src="inventory-data.js"></script>
     <script src="inventario.js"></script>
+    <script type="module" src="auth-guard.js"></script>
 </body>
 
 </html>

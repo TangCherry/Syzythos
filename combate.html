@@ -6,9 +6,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Muscules · Bestiario dinámico</title>
   <link rel="stylesheet" href="combate.css">
+  <link rel="stylesheet" href="auth.css">
+  <script src="supabase-config.js"></script>
 </head>
 
-<body>
+<body data-auth-required="session">
   <main class="game game--player" id="game">
     <img class="corner tl" src="assets/combate/chispa.png" alt=""><img class="corner tr" src="assets/combate/chispa.png"
       alt=""><img class="corner bl" src="assets/combate/chispa.png" alt=""><img class="corner br"
@@ -89,6 +91,7 @@
   <script src="neo-stats-lock.js" defer></script>
   <script src="enemies.js" defer></script>
   <script src="combate.js" defer></script>
+  <script type="module" src="auth-guard.js"></script>
 </body>
 
 </html>

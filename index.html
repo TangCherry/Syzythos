@@ -7,10 +7,17 @@
     <meta name="theme-color" content="#42303a">
     <title>Muscules | Neo</title>
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="auth.css">
+    <link rel="stylesheet" href="home-auth.css">
+    <script src="supabase-config.js"></script>
 </head>
 
-<body>
+<body data-auth-required="session">
     <main class="game" aria-label="Inicio de Muscules">
+        <button class="home-signout" type="button" data-auth-signout aria-label="Cerrar sesión" aria-describedby="home-signout-error">
+            <img src="assets/exit.png" alt="">
+        </button>
+        <p id="home-signout-error" class="home-signout-error" data-auth-signout-error role="alert" hidden></p>
         <div class="frame">
             <img class="corner tl" src="assets/sparkle.png" alt=""><img class="corner tr" src="assets/sparkle.png"
                 alt=""><img class="corner bl" src="assets/sparkle.png" alt=""><img class="corner br"
@@ -37,6 +44,7 @@
         </div>
     </dialog>
     <script src="script.js"></script>
+    <script type="module" src="auth-guard.js"></script>
 </body>
 
 </html>

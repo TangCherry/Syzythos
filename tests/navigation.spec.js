@@ -9,7 +9,9 @@ const pages = [
   '/dm.html',
   '/dm-perfil.html',
   '/dm-inventario.html',
-  '/dm-encuentro.html'
+  '/dm-encuentro.html',
+  '/login.html',
+  '/diagnostico.html'
 ];
 
 test('las páginas principales cargan sin errores JavaScript', async ({ page }) => {

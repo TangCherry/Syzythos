@@ -6,8 +6,10 @@
   <meta name="theme-color" content="#42303a">
   <title>Muscules | Perfil de Neo · DM</title>
   <link rel="stylesheet" href="dm.css">
+  <link rel="stylesheet" href="auth.css">
+  <script src="supabase-config.js"></script>
 </head>
-<body>
+<body data-auth-required="dm">
   <main class="dm-screen dm-screen--interior" aria-label="Administrar perfil de Neo">
     <img class="dm-star dm-star--tl" src="assets/sparkle.png" alt="">
     <img class="dm-star dm-star--tr" src="assets/sparkle.png" alt="">
@@ -60,5 +62,6 @@
   </main>
   <script src="neo-stats-lock.js"></script>
   <script src="dm-perfil.js"></script>
+  <script type="module" src="auth-guard.js"></script>
 </body>
 </html>
