@@ -1,0 +1,47 @@
+.home-signout {
+  position: absolute;
+  z-index: 5;
+  top: 26px;
+  right: 26px;
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.home-signout img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
+.home-signout:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.home-signout-error {
+  position: absolute;
+  z-index: 6;
+  top: 82px;
+  right: 20px;
+  width: min(260px, calc(100% - 40px));
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid #6b1f26;
+  border-radius: 6px;
+  background: #fff0ef;
+  color: #6b1f26;
+  font: 14px/1.35 system-ui, sans-serif;
+  overflow-wrap: anywhere;
+}
+
+.home-signout-error[hidden] {
+  display: none;
+}

@@ -192,20 +192,15 @@ body {
 }
 
 .slot img {
-    width: 100%;
-    height: 100%;
-    object-fit: contain
-}
-
-.qty {
     position: absolute;
-    right: 1px;
-    bottom: 0;
-    color: white;
-    background: #553824;
-    border-radius: 3px;
-    padding: 0 3px;
-    font: 11px Arial, sans-serif
+    top: 50%;
+    left: 50%;
+    width: calc(100% - 12px);
+    height: calc(100% - 12px);
+    transform: translate(-50%, -50%);
+    object-fit: contain;
+    object-position: center;
+    z-index: 0
 }
 
 .hint {
@@ -214,8 +209,25 @@ body {
     left: 0;
     right: 0;
     text-align: center;
-    color: #6c4530;
-    font: 12px Arial, sans-serif
+    color: #fff;
+    font: 12px Arial, sans-serif;
+    text-shadow: 0 1px 3px #000
+}
+
+.gift-status {
+    position: absolute;
+    top: 78%;
+    left: 8%;
+    width: 84%;
+    margin: 0;
+    color: #ffd2c9;
+    text-align: center;
+    font: 12px/1.35 Arial, sans-serif;
+    text-shadow: 0 1px 3px #000
+}
+
+.gift-status[hidden] {
+    display: none
 }
 
 dialog {
@@ -252,11 +264,6 @@ dialog::backdrop {
     object-fit: contain
 }
 
-.dialog-inner p {
-    margin: 0;
-    font: 14px Arial, sans-serif
-}
-
 .close {
     position: absolute;
     right: 8px;
@@ -269,6 +276,211 @@ dialog::backdrop {
     cursor: pointer;
     width: 32px;
     height: 32px
+}
+
+.delete-item {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    min-width: 108px;
+    padding: 8px 14px;
+    border: 1px solid #54211d;
+    border-radius: 7px;
+    background: linear-gradient(#a83d32, #7d241f);
+    box-shadow: inset 0 1px 0 #ffffff45, 0 2px 3px #0004;
+    color: #fff8e9;
+    font: bold 14px Arial, sans-serif;
+    text-shadow: 0 1px 1px #421813;
+    cursor: pointer
+}
+
+.delete-item[hidden] {
+    display: none
+}
+
+.delete-item:hover,
+.delete-item:focus-visible {
+    background: linear-gradient(#bd4c3f, #8b2b24);
+    outline: 2px solid #f1d2a4;
+    outline-offset: 2px
+}
+
+.delete-item:disabled {
+    opacity: .55;
+    cursor: not-allowed
+}
+
+.delete-item img {
+    width: 16px;
+    height: 16px;
+    object-fit: contain;
+    filter: brightness(0) invert(1)
+}
+
+.delete-confirm-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    display: grid;
+    place-items: center;
+    background: transparent
+}
+
+.delete-confirm-overlay[hidden] {
+    display: none !important
+}
+
+.delete-confirm {
+    width: min(84vw, 300px);
+    padding: 22px 18px 18px;
+    border: 2px solid #a4774d;
+    border-radius: 12px;
+    background: #39251c;
+    box-shadow: 0 12px 35px #0009;
+    color: #fff3df;
+    text-align: center
+}
+
+.delete-confirm p {
+    margin: 0 0 22px;
+    font: 17px/1.35 Georgia, serif
+}
+
+.delete-confirm .delete-confirm-error {
+    margin: -12px 0 14px;
+    color: #ffd2c9;
+    font: 12px/1.35 Arial, sans-serif
+}
+
+.delete-confirm-error[hidden] {
+    display: none
+}
+
+.delete-confirm-actions {
+    display: flex;
+    justify-content: center;
+    gap: 12px
+}
+
+.delete-confirm-actions button {
+    min-width: 100px;
+    padding: 9px 14px;
+    border: 1px solid #241811;
+    border-radius: 7px;
+    color: white;
+    font: 15px Georgia, serif;
+    cursor: pointer
+}
+
+.delete-confirm-yes {
+    background: linear-gradient(#a83d32, #7d241f)
+}
+
+.delete-confirm-no {
+    background: linear-gradient(#777, #555)
+}
+
+.delete-confirm-actions button:focus-visible {
+    outline: 2px solid #f1d2a4;
+    outline-offset: 2px
+}
+
+.gift-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: grid;
+    place-items: center;
+    padding: 22px;
+    background: rgba(32, 32, 38, .78)
+}
+
+.gift-overlay[hidden] {
+    display: none !important
+}
+
+.gift-window {
+    width: min(340px, 88vw);
+    max-height: min(90dvh, 700px);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 24px 20px 20px;
+    border: 1px solid #60545f;
+    border-radius: 12px;
+    background: #09090b;
+    box-shadow: 0 16px 48px #000b;
+    color: #fff;
+    text-align: center
+}
+
+.gift-window h2 {
+    margin: 0;
+    font: 20px/1.3 Georgia, serif
+}
+
+.gift-image {
+    width: 100px;
+    height: 100px;
+    padding: 8px;
+    border: 1px solid #c8a67c;
+    border-radius: 8px;
+    background: #f3e7d0;
+    object-fit: contain
+}
+
+.gift-item-name {
+    margin: -4px 0 0;
+    font: 18px Georgia, serif
+}
+
+.gift-message {
+    width: 100%;
+    margin: 0;
+    padding: 11px 13px;
+    border-radius: 9px;
+    background: #633d91;
+    color: #fff;
+    font: 15px/1.35 Georgia, serif;
+    overflow-wrap: anywhere
+}
+
+.gift-message[hidden],
+.gift-error[hidden] {
+    display: none
+}
+
+.gift-error {
+    margin: 0;
+    color: #ffc2b8;
+    font: 13px/1.35 Arial, sans-serif
+}
+
+.gift-accept {
+    min-width: 140px;
+    min-height: 42px;
+    padding: 9px 20px;
+    border: 1px solid #75b76f;
+    border-radius: 8px;
+    background: #278b2c;
+    color: #fff;
+    font: bold 16px Georgia, serif;
+    cursor: pointer
+}
+
+.gift-accept:hover,
+.gift-accept:focus-visible {
+    background: #319d37;
+    outline: 2px solid #d5f3c9;
+    outline-offset: 2px
+}
+
+.gift-accept:disabled {
+    cursor: wait;
+    opacity: .7
 }
 
 @media(max-width:393px) {

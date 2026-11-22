@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#42303a">
+  <title>Iniciar sesión · Muscules</title>
+  <link rel="stylesheet" href="auth.css">
+  <link rel="stylesheet" href="login.css">
+  <script src="supabase-config.js"></script>
+</head>
+<body class="auth-page login-page">
+  <main class="auth-panel login-portal">
+    <div class="login-frame" aria-hidden="true">
+      <img class="login-star login-star--tl" src="assets/sparkle.png" alt="">
+      <img class="login-star login-star--tr" src="assets/sparkle.png" alt="">
+      <img class="login-star login-star--bl" src="assets/sparkle.png" alt="">
+      <img class="login-star login-star--br" src="assets/sparkle.png" alt="">
+    </div>
+    <h1 class="login-heading">Bienvenido,<br>aventurero</h1>
+    <p id="login-status" class="auth-status login-status" role="status" aria-live="polite"></p>
+    <form id="login-form" class="login-form">
+      <div class="login-field login-field--email">
+        <label for="login-email">Correo</label>
+        <input id="login-email" name="email" type="email" autocomplete="username" required>
+      </div>
+      <div class="login-field login-field--password">
+        <label for="login-password">Contraseña</label>
+        <input id="login-password" name="password" type="password" autocomplete="current-password" required>
+      </div>
+      <button id="login-submit" type="submit">Entrar a la aventura</button>
+    </form>
+    <img class="login-swords" src="assets/swords.png" alt="" aria-hidden="true">
+    <section id="active-session" class="active-session login-active-session" hidden>
+      <p>Ya hay una sesión activa.</p>
+      <a id="continue-link" class="auth-button" href="index.html">Continuar</a>
+      <a class="auth-button auth-button--secondary" href="diagnostico.html">Diagnóstico remoto</a>
+      <button id="logout-button" class="auth-button auth-button--secondary" type="button">Cerrar sesión</button>
+    </section>
+  </main>
+  <script type="module" src="login.js"></script>
+</body>
+</html>

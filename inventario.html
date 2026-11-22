@@ -6,9 +6,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Muscules | Inventario de Neo</title>
     <link rel="stylesheet" href="inventario.css">
+    <link rel="stylesheet" href="auth.css">
+    <script src="supabase-config.js"></script>
 </head>
 
-<body>
+<body data-auth-required="player">
     <main class="inventory-screen">
         <div class="inventory-frame">
             <a class="back" href="index.html" aria-label="Volver al inicio">← <span>Atrás</span></a>
@@ -23,16 +25,42 @@
             <h2>Inventario</h2>
             <div id="inventory-grid" class="inventory-grid" aria-label="Objetos de Neo"></div>
             <p class="hint">Toca un objeto para ver su tarjeta.</p>
+            <p id="gift-status" class="gift-status" role="status" aria-live="polite" hidden></p>
         </div>
     </main>
     <dialog id="item-dialog" aria-labelledby="item-title">
         <div class="dialog-inner"><button class="close" type="button" aria-label="Cerrar">×</button>
             <h2 id="item-title"></h2><img id="item-card" alt="Tarjeta del objeto">
-            <p id="item-count"></p>
+            <button id="item-delete" class="delete-item" type="button">
+                <img src="assets/trash.png" alt="">
+                <span>Borrar</span>
+            </button>
+        </div>
+        <div id="delete-confirm-overlay" class="delete-confirm-overlay" hidden>
+            <section class="delete-confirm" role="dialog" aria-modal="true" aria-labelledby="delete-confirm-title">
+                <p id="delete-confirm-title">¿Seguro que quieres borrar este item?</p>
+                <p id="delete-confirm-error" class="delete-confirm-error" aria-live="polite" hidden></p>
+                <div class="delete-confirm-actions">
+                    <button id="delete-confirm-yes" class="delete-confirm-yes" type="button">Borrar</button>
+                    <button id="delete-confirm-no" class="delete-confirm-no" type="button">Cerrar</button>
+                </div>
+            </section>
         </div>
     </dialog>
+    <div id="gift-overlay" class="gift-overlay" hidden>
+        <section class="gift-window" role="dialog" aria-modal="true" aria-labelledby="gift-title">
+            <h2 id="gift-title">La sexy dm te ha regalado algo bonito</h2>
+            <img id="gift-image" class="gift-image" alt="">
+            <p id="gift-item-name" class="gift-item-name"></p>
+            <p id="gift-message" class="gift-message" hidden></p>
+            <p id="gift-error" class="gift-error" role="alert" hidden></p>
+            <button id="gift-accept" class="gift-accept" type="button">Aceptar</button>
+        </section>
+    </div>
+    <script src="neo-stats-lock.js"></script>
     <script src="inventory-data.js"></script>
-    <script src="inventario.js"></script>
+    <script type="module" src="inventario.js"></script>
+    <script type="module" src="auth-guard.js"></script>
 </body>
 
 </html>

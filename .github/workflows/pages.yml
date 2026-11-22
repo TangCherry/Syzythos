@@ -27,10 +27,36 @@ jobs:
         uses: actions/checkout@v4
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
+      - name: Verify production Supabase project
+        env:
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+        run: |
+          node --input-type=module <<'NODE'
+          const expected = 'https://kooaebewhqljmqzkqrgr.supabase.co';
+          let actual;
+          try {
+            actual = new URL(process.env.SUPABASE_URL || '');
+          } catch {
+            throw new Error('SUPABASE_URL no es una URL válida.');
+          }
+          if (actual.origin !== expected || actual.pathname !== '/'
+            || actual.search || actual.hash || actual.username || actual.password) {
+            throw new Error('SUPABASE_URL no apunta al proyecto Syzythos de producción.');
+          }
+          NODE
+      - name: Generate public Supabase configuration
+        env:
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
+        run: node scripts/generate-supabase-config.js
+      - name: Assemble allowlisted Pages site
+        env:
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+        run: node scripts/assemble-pages-site.mjs
       - name: Upload site
         uses: actions/upload-pages-artifact@v3
         with:
-          path: .
+          path: dist/pages
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4

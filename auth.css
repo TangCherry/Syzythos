@@ -1,0 +1,143 @@
+body[data-auth-required]:not([data-auth-ready]) {
+  visibility: hidden;
+}
+
+body[data-auth-blocked] > :not(.auth-error) {
+  display: none !important;
+}
+
+.auth-page {
+  min-height: 100vh;
+  margin: 0;
+  padding: 24px;
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  background: #42303a;
+  color: #fff;
+  font-family: system-ui, sans-serif;
+}
+
+.auth-panel,
+.auth-error {
+  width: min(100%, 440px);
+  padding: 32px;
+  border: 1px solid rgb(255 255 255 / 22%);
+  border-radius: 20px;
+  background: #fffaf5;
+  color: #42303a;
+  box-shadow: 0 16px 48px rgb(0 0 0 / 22%);
+  box-sizing: border-box;
+}
+
+.auth-panel h1,
+.auth-error h1 {
+  margin: 0 0 8px;
+}
+
+.auth-subtitle {
+  margin: 0 0 24px;
+  color: #66545e;
+}
+
+.auth-panel form {
+  display: grid;
+  gap: 10px;
+}
+
+.auth-panel form[hidden] {
+  display: none;
+}
+
+.auth-panel input {
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid #b7a8af;
+  border-radius: 8px;
+  box-sizing: border-box;
+  font: inherit;
+}
+
+.auth-panel button,
+.auth-button {
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 8px;
+  background: #6b4058;
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  text-align: center;
+  text-decoration: none;
+}
+
+.auth-panel form button {
+  margin-top: 12px;
+}
+
+.auth-panel button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.auth-button--secondary {
+  background: #ede3e8 !important;
+  color: #42303a !important;
+}
+
+.auth-status {
+  min-height: 1.5em;
+  color: #315d3b;
+}
+
+.auth-status.is-error {
+  color: #9c2635;
+}
+
+.active-session {
+  display: grid;
+  gap: 12px;
+}
+
+.active-session[hidden] {
+  display: none;
+}
+
+.auth-back {
+  display: inline-block;
+  margin-bottom: 20px;
+  color: #6b4058;
+}
+
+.diagnostic-results {
+  margin: 20px 0;
+}
+
+.diagnostic-results div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 0;
+  border-bottom: 1px solid #e8dfe3;
+}
+
+.diagnostic-results dt {
+  font-weight: 700;
+}
+
+.diagnostic-results dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.diagnostic-panel > button {
+  width: 100%;
+}
+
+.auth-error {
+  margin: 24px auto;
+}
