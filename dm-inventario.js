@@ -21,6 +21,7 @@ import {
   let gameState = null;
   let busy = false;
   let loading = false;
+  let renderedInventory = null;
 
   if (!Array.isArray(catalog)) throw new Error('No se pudo cargar el catálogo de objetos.');
 
@@ -31,6 +32,10 @@ import {
 
   function renderInventory({ quiet = false } = {}) {
     const inventory = gameState?.inventory || [];
+    const selectedSlot = removeSlot.value;
+    const inventoryUnchanged = renderedInventory !== null
+      && inventory.length === renderedInventory.length
+      && inventory.every((id, index) => id === renderedInventory[index]);
     const full = inventory.length >= 15;
     saveButton.disabled = busy || loading || !gameState || full
       || !itemById.has(itemSelect.value) || messageInput.value.length > 100;
@@ -47,8 +52,11 @@ import {
       option.textContent = `${itemById.get(id)?.name || id} · espacio ${index + 1}`;
       removeSlot.append(option);
     });
+    if (inventoryUnchanged && selectedSlot !== '') removeSlot.value = selectedSlot;
+    renderedInventory = [...inventory];
     removeSlot.disabled = busy || loading || inventory.length === 0;
-    removeButton.disabled = busy || loading || !gameState || inventory.length === 0;
+    removeButton.disabled = busy || loading || !gameState || inventory.length === 0
+      || removeSlot.value === '';
     removeButton.textContent = busy ? 'Guardando…' : 'Retirar';
     if (!quiet) showStatus(`Objetos: ${inventory.length}/15`);
   }
@@ -112,6 +120,9 @@ import {
     renderInventory({ quiet: true });
   });
   messageInput.addEventListener('input', () => {
+    renderInventory({ quiet: true });
+  });
+  removeSlot.addEventListener('change', () => {
     renderInventory({ quiet: true });
   });
   saveButton.addEventListener('click', () => {

@@ -131,6 +131,141 @@ test('un error de lectura retrasada no borra el estado tras una acción exitosa'
   await expect(page.locator('#log')).toContainText('Ronda 1: acción procesada');
 });
 
+test('un fallo de refresh cierra y limpia el inventario sin dejar acciones sobre estado nulo', async ({ page }) => {
+  const encounterId = 'inventory-read-failure';
+  await openActiveCombat(page, encounterId, { inventory: ['bola'] });
+  await page.locator('#inventory-toggle').click();
+  await expect(page.locator('#inventory-grid button:not(:disabled)')).toHaveCount(1);
+  await page.evaluate(() => {
+    window.__staleInventorySlot = document.querySelector('#inventory-grid button:not(:disabled)');
+  });
+
+  const readId = await page.evaluate(() =>
+    window.MUSCULES_SUPABASE_TEST_ADAPTER.deferNextGameStateRead()
+  );
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await expect.poll(() => page.evaluate(id =>
+    window.MUSCULES_SUPABASE_TEST_ADAPTER.isDeferredGameStateReadStarted(id), readId
+  )).toBe(true);
+  await page.evaluate(id =>
+    window.MUSCULES_SUPABASE_TEST_ADAPTER.rejectDeferredGameStateRead(id, 'Lectura remota fallida'),
+    readId
+  );
+
+  await expect(page.locator('#waiting')).toBeVisible();
+  await expect(page.locator('#inventory-overlay')).toBeHidden();
+  await expect(page.locator('#inventory-grid button')).toHaveCount(0);
+  const pageErrors = [];
+  page.on('pageerror', error => pageErrors.push(error.message));
+  await page.evaluate(() => window.__staleInventorySlot.click());
+  expect(pageErrors).toEqual([]);
+  expect(await page.evaluate(() =>
+    window.MUSCULES_SUPABASE_TEST_QUERIES.filter(query => query.rpc === 'player_use_item').length
+  )).toBe(0);
+});
+
+test('un error de RPC permanece visible tras un refresh y se limpia al iniciar otra acción', async ({ page }) => {
+  const encounterId = 'persistent-action-error';
+  await openActiveCombat(page, encounterId);
+  await page.evaluate(() =>
+    window.MUSCULES_SUPABASE_TEST_ADAPTER.failNextRpc(
+      'player_combat_turn',
+      'XX000',
+      'Fallo de RPC simulado'
+    )
+  );
+  await page.locator('#roll').click();
+  await expect(page.locator('#log')).toContainText('Fallo de RPC simulado');
+
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await expect(page.locator('#log')).toContainText('Fallo de RPC simulado');
+  await page.locator('#roll').click();
+  await expect.poll(() => page.evaluate(() =>
+    window.MUSCULES_SUPABASE_TEST_ADAPTER.getGameData().revision
+  )).toBe(1);
+  await expect(page.locator('#log')).toContainText('Ronda 1: acción procesada por el servidor de prueba.');
+});
+
+test('la expiración automática se procesa para un segundo encuentro en la misma página', async ({ page }) => {
+  const firstEncounterId = 'expiry-first-encounter';
+  const expiredAt = Date.now() - 1000;
+  const currentPointer = {
+    ...pointer('carrotnero', firstEncounterId),
+    startedAt: expiredAt - 1000,
+    expiresAt: expiredAt
+  };
+  await seedStorage(page, {
+    local: {
+      [STATS_KEY]: stats(),
+      [INVENTORY_KEY]: [],
+      [POINTER_KEY]: currentPointer,
+      [BATTLE_PREFIX + 'carrotnero']: battle('carrotnero', firstEncounterId, {
+        enemyHp: 45,
+        heroHp: 28,
+        status: 'active',
+        reason: null,
+        round: 0,
+        startedAt: currentPointer.startedAt,
+        expiresAt: expiredAt
+      })
+    }
+  });
+  await page.goto('/combate.html');
+  await expect.poll(() => page.evaluate(() =>
+    window.MUSCULES_SUPABASE_TEST_QUERIES.filter(query => query.rpc === 'player_combat_turn').length
+  )).toBe(1);
+  await expect.poll(() =>
+    page.evaluate(id =>
+      window.MUSCULES_SUPABASE_TEST_ADAPTER.getGameData().battles[id].status,
+      firstEncounterId
+    )
+  ).toBe('lost');
+
+  const secondEncounterId = 'expiry-second-encounter';
+  await page.evaluate(({ encounterId }) => {
+    const adapter = window.MUSCULES_SUPABASE_TEST_ADAPTER;
+    const data = adapter.getGameData();
+    const expiredAt = Date.now() - 1000;
+    const startedAt = expiredAt - 1000;
+    const previousBattle = data.battles['expiry-first-encounter'];
+    data.revision++;
+    data.currentEncounter = {
+      enemyId: 'carrotnero',
+      encounterId,
+      startedAt,
+      expiresAt: expiredAt,
+      dmMessage: ''
+    };
+    data.battles[encounterId] = {
+      ...previousBattle,
+      id: `battle-${encounterId}`,
+      encounterId,
+      startedAt,
+      expiresAt: expiredAt,
+      enemyHp: 45,
+      heroHp: data.hero.hp,
+      status: 'active',
+      reason: null,
+      round: 0,
+      claimed: false,
+      itemUsed: false,
+      message: 'Segundo encuentro de prueba.'
+    };
+    adapter.setGameData(data);
+    window.dispatchEvent(new Event('focus'));
+  }, { encounterId: secondEncounterId });
+
+  await expect.poll(() => page.evaluate(() =>
+    window.MUSCULES_SUPABASE_TEST_QUERIES.filter(query => query.rpc === 'player_combat_turn').length
+  )).toBe(2);
+  await expect.poll(() =>
+    page.evaluate(id =>
+      window.MUSCULES_SUPABASE_TEST_ADAPTER.getGameData().battles[id].status,
+      secondEncounterId
+    )
+  ).toBe('lost');
+});
+
 test('un cambio remoto de revisión invalida la selección del objeto y permite volver a elegir', async ({ page }) => {
   const encounterId = 'inventory-revision-change';
   await openActiveCombat(page, encounterId, { inventory: ['bola', 'fuego'] });
@@ -149,6 +284,8 @@ test('un cambio remoto de revisión invalida la selección del objeto y permite 
 
   await expect(page.locator('#inventory-hint'))
     .toContainText('El estado cambió en otro dispositivo');
+  await expect(page.locator('#inventory-hint'))
+    .toContainText('selecciona nuevamente el objeto');
   await expect(page.locator('#inventory-apply')).toBeDisabled();
   await expect.poll(() => page.evaluate(() =>
     window.MUSCULES_SUPABASE_TEST_ADAPTER.getGameData().inventory
@@ -183,7 +320,9 @@ test('un conflicto de revisión no consume el objeto del espacio actualizado rem
   await page.locator('#inventory-apply').click();
 
   await expect(page.locator('#inventory-hint'))
-    .toContainText('El estado cambió en otro dispositivo');
+    .toContainText('La partida cambió en otro dispositivo');
+  await expect(page.locator('#inventory-hint'))
+    .toContainText('selecciona nuevamente el objeto');
   await expect.poll(() => page.evaluate(() => {
     const data = window.MUSCULES_SUPABASE_TEST_ADAPTER.getGameData();
     return { revision: data.revision, inventory: data.inventory };

@@ -47,6 +47,7 @@
   };
   let deferredReadSequence = 0;
   let nextDeferredGameStateRead = null;
+  let nextRpcFailure = null;
   const deferredGameStateReads = new Map();
 
   function deferNextGameStateRead() {
@@ -270,6 +271,14 @@
         sessionStorage.setItem(QUERY_KEY, JSON.stringify(window.MUSCULES_SUPABASE_TEST_QUERIES));
         const dmOperations = ['dm_update_hero', 'dm_grant_item', 'dm_remove_item', 'dm_activate_encounter'];
         if (!session || (dmOperations.includes(name) ? role !== 'dm' : role !== 'player')) return roleError();
+        if (nextRpcFailure?.name === name) {
+          const failure = nextRpcFailure;
+          nextRpcFailure = null;
+          return {
+            data: null,
+            error: { code: failure.code, message: failure.message }
+          };
+        }
 
         const requestId = args.p_request_id;
         const receiptKey = `${session.user.id}:${name}:${requestId}`;
@@ -438,6 +447,7 @@
     createClient,
     getGameData: () => clone(readGameData()),
     setGameData: data => writeGameData(clone(data)),
+    failNextRpc: (name, code, message) => { nextRpcFailure = { name, code, message }; },
     deferNextGameStateRead,
     isDeferredGameStateReadStarted: id => deferredGameStateReads.get(id)?.started || false,
     resolveDeferredGameStateRead: id => finishDeferredGameStateRead(id, { type: 'success' }),

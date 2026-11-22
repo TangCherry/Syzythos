@@ -41,8 +41,10 @@ import {
   let busy = false;
   let loading = false;
   let appliedStateVersion = 0;
-  let expiryRequested = false;
+  let expiryRequestedFor = null;
   let lastCounterattackMessage = '';
+  let actionError = '';
+  let inventorySelectionNotice = '';
 
   if (!Array.isArray(catalog) || !Array.isArray(itemCatalog)) {
     showNoEncounter('No se pudieron cargar los datos necesarios para mostrar el combate.');
@@ -50,17 +52,23 @@ import {
   }
 
   function showNoEncounter(message = 'Por el momento no hay encuentro flaquito chulo') {
+    closeInventory();
     $('battle').hidden = true;
     $('win').hidden = true;
     $('lose').hidden = true;
     $('waiting').hidden = false;
-    $('waiting-message').textContent = message;
+    $('waiting-message').textContent = actionError || message;
+    $('waiting-message').classList.toggle('is-error', Boolean(actionError));
   }
 
   function showError(message) {
-    const target = battle?.status === 'won' ? $('claim-status') : $('log');
-    target.textContent = message;
-    target.classList.add('is-error');
+    actionError = message;
+  }
+
+  function clearActionError() {
+    actionError = '';
+    ['log', 'claim-status', 'lose-detail', 'inventory-hint', 'waiting-message']
+      .forEach(id => $(id).classList.remove('is-error'));
   }
 
   function invalidateInventorySelection() {
@@ -68,8 +76,9 @@ import {
     selectedItemId = null;
     selectedRevision = null;
     $('inventory-apply').disabled = true;
-    $('inventory-hint').textContent =
+    inventorySelectionNotice =
       'El estado cambió en otro dispositivo. Vuelve al inventario y selecciona nuevamente el objeto.';
+    $('inventory-hint').textContent = inventorySelectionNotice;
   }
 
   function applyGameData(nextData) {
@@ -116,6 +125,7 @@ import {
     selectedSlot = -1;
     selectedItemId = null;
     selectedRevision = null;
+    inventorySelectionNotice = '';
     $('inventory-overlay').hidden = false;
     $('inventory-grid-view').hidden = false;
     $('inventory-detail').hidden = true;
@@ -144,12 +154,14 @@ import {
   }
 
   function showItemDetail(index) {
+    if (!gameData) return;
     const id = gameData.inventory[index];
     const item = itemById.get(id);
     if (!item) return;
     selectedSlot = index;
     selectedItemId = id;
     selectedRevision = gameData.revision;
+    inventorySelectionNotice = '';
     $('inventory-grid-view').hidden = true;
     $('inventory-detail').hidden = false;
     const card = $('inventory-card');
@@ -172,9 +184,13 @@ import {
     selectedSlot = -1;
     selectedItemId = null;
     selectedRevision = null;
+    inventorySelectionNotice = '';
     $('inventory-overlay').hidden = true;
     $('inventory-detail').hidden = true;
     $('inventory-grid-view').hidden = false;
+    $('inventory-grid').replaceChildren();
+    $('inventory-card').replaceChildren();
+    $('inventory-hint').textContent = '';
   }
 
   function renderHeroHealth() {
@@ -202,6 +218,8 @@ import {
       showNoEncounter();
       return;
     }
+    ['log', 'claim-status', 'lose-detail', 'inventory-hint', 'waiting-message']
+      .forEach(id => $(id).classList.remove('is-error'));
     renderHeroHealth();
     document.querySelectorAll('[data-counterattack-message]').forEach(element => {
       element.textContent = lastCounterattackMessage;
@@ -266,6 +284,19 @@ import {
             : gameData.hero.hp > 0
               ? `Neo volvió con ${gameData.hero.hp}/${gameData.hero.maxHp} HP. La derrota es permanente; Cherry puede activar un nuevo encuentro.`
               : '0 HP · Esperando a Cherry para revivir';
+    if (actionError) {
+      const target = !$('inventory-overlay').hidden
+        ? $('inventory-hint')
+        : battle.status === 'won'
+          ? $('claim-status')
+          : battle.status === 'lost'
+              ? $('lose-detail')
+              : $('log');
+      target.textContent = target === $('inventory-hint')
+        ? [actionError, inventorySelectionNotice].filter(Boolean).join(' ')
+        : actionError;
+      target.classList.add('is-error');
+    }
   }
 
   async function refresh({ quiet = false, force = false } = {}) {
@@ -347,6 +378,7 @@ import {
       return null;
     }
     const actionEncounterId = encounter.encounterId;
+    clearActionError();
     lastCounterattackMessage = '';
     busy = true;
     render();
@@ -426,11 +458,14 @@ import {
   });
 
   async function settleExpiredEncounter() {
-    if (expiryRequested || busy || battle?.status !== 'active'
+    const encounterId = encounter?.encounterId;
+    if (!encounterId || expiryRequestedFor === encounterId || busy || battle?.status !== 'active'
       || Date.now() < (battle.expiresAt || 0)) return;
-    expiryRequested = true;
+    expiryRequestedFor = encounterId;
     const result = await performAction('player_combat_turn');
-    if (!result && battle?.status === 'active') expiryRequested = false;
+    if (!result && expiryRequestedFor === encounterId) {
+      expiryRequestedFor = null;
+    }
   }
 
   window.addEventListener('focus', () => refresh({ quiet: true }));

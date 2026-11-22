@@ -45,6 +45,10 @@ body[data-auth-blocked] > :not(.auth-error) {
   gap: 10px;
 }
 
+.auth-panel form[hidden] {
+  display: none;
+}
+
 .auth-panel input {
   width: 100%;
   min-height: 44px;

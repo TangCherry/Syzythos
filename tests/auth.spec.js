@@ -18,6 +18,7 @@ test('una sesión simulada permite entrar y cerrar sesión sin usar credenciales
   });
   await page.goto('/login.html');
   await expect(page.locator('#active-session')).toBeVisible();
+  await expect(page.locator('#login-form')).toBeHidden();
   await page.locator('#logout-button').click();
   await expect(page.locator('#login-form')).toBeVisible();
 });

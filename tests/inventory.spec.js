@@ -19,6 +19,41 @@ test('el inventario DM permite duplicados hasta 15 y bloquea la unidad 16', asyn
     .toEqual(Array(15).fill('cumbia'));
 });
 
+test('Cherry conserva la selección de retiro si el inventario no cambia y la invalida si cambia', async ({ page }) => {
+  await seedStorage(page, {
+    local: {
+      [INVENTORY_KEY]: ['cumbia', 'bola']
+    }
+  });
+  await page.goto('/dm-inventario.html?__mock_role=dm');
+
+  const removeSlot = page.locator('#dm-remove-slot');
+  const removeButton = page.locator('#dm-inventory-remove');
+  await expect(removeSlot.locator('option')).toHaveCount(3);
+  await removeSlot.selectOption('1');
+  await page.locator('#dm-message').fill('Mensaje de prueba');
+  await expect(removeSlot).toHaveValue('1');
+  await expect(removeButton).toBeEnabled();
+
+  await page.evaluate(() => {
+    const adapter = window.MUSCULES_SUPABASE_TEST_ADAPTER;
+    const data = adapter.getGameData();
+    data.revision++;
+    data.inventory = ['bola'];
+    adapter.setGameData(data);
+    window.dispatchEvent(new Event('focus'));
+  });
+
+  await expect.poll(() => page.evaluate(() =>
+    window.MUSCULES_SUPABASE_TEST_ADAPTER.getGameData().inventory
+  )).toEqual(['bola']);
+  await expect(removeSlot).toHaveValue('');
+  await expect(removeButton).toBeDisabled();
+  expect(await page.evaluate(() =>
+    window.MUSCULES_SUPABASE_TEST_QUERIES.filter(query => query.rpc === 'dm_remove_item').length
+  )).toBe(0);
+});
+
 test('Neo no puede retirar objetos y los cambios de Cherry persisten tras recargar', async ({ page, context }) => {
   await seedStorage(page, {
     local: {
