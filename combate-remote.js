@@ -36,8 +36,11 @@ import {
   let battle = null;
   let enemy = null;
   let selectedSlot = -1;
+  let selectedItemId = null;
+  let selectedRevision = null;
   let busy = false;
   let loading = false;
+  let appliedStateVersion = 0;
   let expiryRequested = false;
   let lastCounterattackMessage = '';
 
@@ -58,6 +61,25 @@ import {
     const target = battle?.status === 'won' ? $('claim-status') : $('log');
     target.textContent = message;
     target.classList.add('is-error');
+  }
+
+  function invalidateInventorySelection() {
+    selectedSlot = -1;
+    selectedItemId = null;
+    selectedRevision = null;
+    $('inventory-apply').disabled = true;
+    $('inventory-hint').textContent =
+      'El estado cambió en otro dispositivo. Vuelve al inventario y selecciona nuevamente el objeto.';
+  }
+
+  function applyGameData(nextData) {
+    if (gameData && nextData.revision < gameData.revision) return false;
+    if (selectedSlot >= 0 && nextData.revision !== selectedRevision) {
+      invalidateInventorySelection();
+    }
+    gameData = nextData;
+    appliedStateVersion += 1;
+    return true;
   }
 
   function itemKind(id) {
@@ -92,9 +114,12 @@ import {
 
   function showInventoryGrid() {
     selectedSlot = -1;
+    selectedItemId = null;
+    selectedRevision = null;
     $('inventory-overlay').hidden = false;
     $('inventory-grid-view').hidden = false;
     $('inventory-detail').hidden = true;
+    $('inventory-hint').textContent = '';
     const grid = $('inventory-grid');
     grid.replaceChildren();
     for (let index = 0; index < 15; index++) {
@@ -123,6 +148,8 @@ import {
     const item = itemById.get(id);
     if (!item) return;
     selectedSlot = index;
+    selectedItemId = id;
+    selectedRevision = gameData.revision;
     $('inventory-grid-view').hidden = true;
     $('inventory-detail').hidden = false;
     const card = $('inventory-card');
@@ -143,6 +170,8 @@ import {
 
   function closeInventory() {
     selectedSlot = -1;
+    selectedItemId = null;
+    selectedRevision = null;
     $('inventory-overlay').hidden = true;
     $('inventory-detail').hidden = true;
     $('inventory-grid-view').hidden = false;
@@ -218,7 +247,11 @@ import {
     );
     $('revive-button').disabled = busy;
     $('inventory-toggle').disabled = busy || !gameData.inventory.some(canUse);
-    $('inventory-apply').disabled = busy || selectedSlot < 0 || !canUse(gameData.inventory[selectedSlot]);
+    const itemSelectionValid = selectedSlot >= 0
+      && selectedRevision === gameData.revision
+      && gameData.inventory[selectedSlot] === selectedItemId;
+    $('inventory-apply').disabled = busy || !itemSelectionValid
+      || !canUse(gameData.inventory[selectedSlot]);
     $('lose').querySelector('h1').textContent = battle.reason === 'escape' ? 'Huida' : 'Derrota';
     $('lose-reason').textContent = battle.reason === 'escape'
       ? 'Escapó' : battle.reason === 'time' ? 'Tiempo agotado'
@@ -237,10 +270,14 @@ import {
 
   async function refresh({ quiet = false, force = false } = {}) {
     if (loading || (busy && !force) || document.visibilityState === 'hidden') return;
+    const stateVersionAtStart = appliedStateVersion;
     loading = true;
     try {
       const remote = await readRemoteGameState();
-      gameData = remote.data;
+      if (gameData && (remote.data.revision < gameData.revision
+        || (appliedStateVersion !== stateVersionAtStart
+          && remote.data.revision <= gameData.revision))) return;
+      if (!applyGameData(remote.data)) return;
       encounter = gameData.currentEncounter;
       if (requestedEncounterId && encounter?.encounterId !== requestedEncounterId) {
         const historicBattle = gameData.battles?.[requestedEncounterId];
@@ -288,6 +325,7 @@ import {
         $('claim-status').classList.remove('is-error');
       }
     } catch (error) {
+      if (appliedStateVersion !== stateVersionAtStart) return;
       gameData = null;
       encounter = null;
       battle = null;
@@ -300,6 +338,14 @@ import {
 
   async function performAction(operation, extraArgs = {}) {
     if (busy || !gameData || !encounter || !battle) return null;
+    if (operation === 'player_use_item'
+      && (extraArgs.p_slot !== selectedSlot
+        || selectedRevision !== gameData.revision
+        || gameData.inventory[selectedSlot] !== selectedItemId)) {
+      invalidateInventorySelection();
+      render();
+      return null;
+    }
     const actionEncounterId = encounter.encounterId;
     lastCounterattackMessage = '';
     busy = true;
@@ -311,23 +357,24 @@ import {
         p_expected_revision: gameData.revision,
         p_request_id: createRequestId()
       });
-      gameData = response.data;
-      battle = gameData.battles?.[actionEncounterId] || null;
-      encounter = gameData.currentEncounter?.encounterId === actionEncounterId
-        ? gameData.currentEncounter
-        : battle?.status === 'won'
-          ? {
-            enemyId: battle.enemyId,
-            encounterId: battle.encounterId,
-            startedAt: battle.startedAt,
-            expiresAt: battle.expiresAt,
-            dmMessage: ''
-          }
-          : gameData.currentEncounter;
-      const catalogEntry = catalog.find(candidate => candidate.id === encounter?.enemyId);
-      enemy = catalogEntry && battle?.enemySnapshot
-        ? { ...catalogEntry, ...battle.enemySnapshot, image: catalogEntry.image, ability: catalogEntry.ability }
-        : null;
+      if (applyGameData(response.data)) {
+        battle = gameData.battles?.[actionEncounterId] || null;
+        encounter = gameData.currentEncounter?.encounterId === actionEncounterId
+          ? gameData.currentEncounter
+          : battle?.status === 'won'
+            ? {
+              enemyId: battle.enemyId,
+              encounterId: battle.encounterId,
+              startedAt: battle.startedAt,
+              expiresAt: battle.expiresAt,
+              dmMessage: ''
+            }
+            : gameData.currentEncounter;
+        const catalogEntry = catalog.find(candidate => candidate.id === encounter?.enemyId);
+        enemy = catalogEntry && battle?.enemySnapshot
+          ? { ...catalogEntry, ...battle.enemySnapshot, image: catalogEntry.image, ability: catalogEntry.ability }
+          : null;
+      }
       if (operation === 'player_combat_turn') {
         const damage = response.result?.enemyDamage;
         lastCounterattackMessage = Number.isSafeInteger(damage) && damage > 0

@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const {
+  BATTLE_PREFIX,
   INVENTORY_KEY,
   POINTER_KEY,
   STATS_KEY,
@@ -8,6 +9,28 @@ const {
   seedStorage,
   stats
 } = require('./support');
+
+async function openActiveCombat(page, encounterId, { inventory = [], hp = 9, maxHp = 18 } = {}) {
+  const enemyId = 'carrotnero';
+  await seedStorage(page, {
+    local: {
+      [STATS_KEY]: stats({ hp, maxHp }),
+      [INVENTORY_KEY]: inventory,
+      [POINTER_KEY]: pointer(enemyId, encounterId),
+      [BATTLE_PREFIX + enemyId]: battle(enemyId, encounterId, {
+        enemyHp: 45,
+        heroHp: hp,
+        status: 'active',
+        reason: null,
+        round: 0
+      })
+    }
+  });
+  await page.goto(`/combate.html?encounter=${encodeURIComponent(encounterId)}`);
+  await expect(page.locator('#battle')).toBeVisible();
+  await expect(page.locator('#roll')).toBeEnabled();
+  return enemyId;
+}
 
 test('el combate envía la acción a la RPC y muestra el estado persistido', async ({ page }) => {
   const enemyId = 'carrotnero';
@@ -49,6 +72,125 @@ test('el combate envía la acción a la RPC y muestra el estado persistido', asy
     rpc: 'player_combat_turn',
     argumentNames: ['p_encounter_id', 'p_expected_revision', 'p_request_id']
   });
+});
+
+test('una lectura anterior a un turno no revierte la respuesta RPC más reciente', async ({ page }) => {
+  const encounterId = 'stale-read-after-turn';
+  await openActiveCombat(page, encounterId);
+  const readId = await page.evaluate(() =>
+    window.MUSCULES_SUPABASE_TEST_ADAPTER.deferNextGameStateRead()
+  );
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await expect.poll(() => page.evaluate(id =>
+    window.MUSCULES_SUPABASE_TEST_ADAPTER.isDeferredGameStateReadStarted(id), readId
+  )).toBe(true);
+
+  await page.locator('#roll').click();
+  await expect(page.locator('#battle [data-hero-hp-value]')).toHaveText('8/18 HP');
+  await expect.poll(() => page.evaluate(() => {
+    const data = window.MUSCULES_SUPABASE_TEST_ADAPTER.getGameData();
+    return { revision: data.revision, round: data.battles['stale-read-after-turn'].round };
+  })).toEqual({ revision: 1, round: 1 });
+
+  await page.evaluate(id =>
+    window.MUSCULES_SUPABASE_TEST_ADAPTER.resolveDeferredGameStateRead(id), readId
+  );
+  await expect(page.locator('#battle')).toBeVisible();
+  await expect(page.locator('#battle [data-hero-hp-value]')).toHaveText('8/18 HP');
+  await expect(page.locator('#log')).toContainText('Ronda 1: acción procesada');
+  await expect.poll(() => page.evaluate(() => {
+    const data = window.MUSCULES_SUPABASE_TEST_ADAPTER.getGameData();
+    return { revision: data.revision, round: data.battles['stale-read-after-turn'].round };
+  })).toEqual({ revision: 1, round: 1 });
+});
+
+test('un error de lectura retrasada no borra el estado tras una acción exitosa', async ({ page }) => {
+  const encounterId = 'stale-read-error-after-turn';
+  await openActiveCombat(page, encounterId);
+  const readId = await page.evaluate(() =>
+    window.MUSCULES_SUPABASE_TEST_ADAPTER.deferNextGameStateRead()
+  );
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await expect.poll(() => page.evaluate(id =>
+    window.MUSCULES_SUPABASE_TEST_ADAPTER.isDeferredGameStateReadStarted(id), readId
+  )).toBe(true);
+
+  await page.locator('#roll').click();
+  await expect(page.locator('#battle [data-hero-hp-value]')).toHaveText('8/18 HP');
+  await expect.poll(() => page.evaluate(() =>
+    window.MUSCULES_SUPABASE_TEST_ADAPTER.getGameData().revision
+  )).toBe(1);
+
+  await page.evaluate(id =>
+    window.MUSCULES_SUPABASE_TEST_ADAPTER.rejectDeferredGameStateRead(id, 'Fallo de lectura retrasada'),
+    readId
+  );
+  await expect(page.locator('#battle')).toBeVisible();
+  await expect(page.locator('#waiting')).toBeHidden();
+  await expect(page.locator('#battle [data-hero-hp-value]')).toHaveText('8/18 HP');
+  await expect(page.locator('#log')).toContainText('Ronda 1: acción procesada');
+});
+
+test('un cambio remoto de revisión invalida la selección del objeto y permite volver a elegir', async ({ page }) => {
+  const encounterId = 'inventory-revision-change';
+  await openActiveCombat(page, encounterId, { inventory: ['bola', 'fuego'] });
+  await page.locator('#inventory-toggle').click();
+  await page.getByRole('button', { name: 'Bola de cristal' }).click();
+  await expect(page.locator('#inventory-card img')).toHaveAttribute('alt', 'Tarjeta: Bola de cristal');
+
+  await page.evaluate(() => {
+    const adapter = window.MUSCULES_SUPABASE_TEST_ADAPTER;
+    const data = adapter.getGameData();
+    data.revision++;
+    data.inventory = ['fuego', 'bola'];
+    adapter.setGameData(data);
+    window.dispatchEvent(new Event('focus'));
+  });
+
+  await expect(page.locator('#inventory-hint'))
+    .toContainText('El estado cambió en otro dispositivo');
+  await expect(page.locator('#inventory-apply')).toBeDisabled();
+  await expect.poll(() => page.evaluate(() =>
+    window.MUSCULES_SUPABASE_TEST_ADAPTER.getGameData().inventory
+  )).toEqual(['fuego', 'bola']);
+  expect(await page.evaluate(() =>
+    window.MUSCULES_SUPABASE_TEST_QUERIES.filter(query => query.rpc === 'player_use_item').length
+  )).toBe(0);
+
+  await page.locator('#inventory-detail-close').click();
+  await page.getByRole('button', { name: 'Fuego en la espada' }).click();
+  await expect(page.locator('#inventory-card img')).toHaveAttribute('alt', 'Tarjeta: Fuego en la espada');
+  await page.locator('#inventory-apply').click();
+  await expect.poll(() => page.evaluate(() => {
+    const data = window.MUSCULES_SUPABASE_TEST_ADAPTER.getGameData();
+    return { revision: data.revision, inventory: data.inventory };
+  })).toEqual({ revision: 2, inventory: ['bola'] });
+});
+
+test('un conflicto de revisión no consume el objeto del espacio actualizado remotamente', async ({ page }) => {
+  const encounterId = 'inventory-revision-conflict';
+  await openActiveCombat(page, encounterId, { inventory: ['bola', 'fuego'] });
+  await page.locator('#inventory-toggle').click();
+  await page.getByRole('button', { name: 'Bola de cristal' }).click();
+
+  await page.evaluate(() => {
+    const adapter = window.MUSCULES_SUPABASE_TEST_ADAPTER;
+    const data = adapter.getGameData();
+    data.revision++;
+    data.inventory = ['fuego', 'bola'];
+    adapter.setGameData(data);
+  });
+  await page.locator('#inventory-apply').click();
+
+  await expect(page.locator('#inventory-hint'))
+    .toContainText('El estado cambió en otro dispositivo');
+  await expect.poll(() => page.evaluate(() => {
+    const data = window.MUSCULES_SUPABASE_TEST_ADAPTER.getGameData();
+    return { revision: data.revision, inventory: data.inventory };
+  })).toEqual({ revision: 1, inventory: ['fuego', 'bola'] });
+  expect(await page.evaluate(() =>
+    window.MUSCULES_SUPABASE_TEST_QUERIES.filter(query => query.rpc === 'player_use_item').length
+  )).toBe(1);
 });
 
 test('muestra el HP autoritativo de Neo después de una victoria', async ({ page }) => {

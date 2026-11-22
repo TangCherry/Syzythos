@@ -45,6 +45,26 @@
       return fallback;
     }
   };
+  let deferredReadSequence = 0;
+  let nextDeferredGameStateRead = null;
+  const deferredGameStateReads = new Map();
+
+  function deferNextGameStateRead() {
+    const id = `deferred-game-state-read-${++deferredReadSequence}`;
+    let resolve;
+    const promise = new Promise(complete => { resolve = complete; });
+    const deferred = { id, started: false, promise, resolve };
+    deferredGameStateReads.set(id, deferred);
+    nextDeferredGameStateRead = deferred;
+    return id;
+  }
+
+  function finishDeferredGameStateRead(id, result) {
+    const deferred = deferredGameStateReads.get(id);
+    if (!deferred?.started) return false;
+    deferred.resolve(result);
+    return true;
+  }
 
   function roleForPage() {
     const requestedRole = new URLSearchParams(location.search).get('__mock_role');
@@ -223,10 +243,19 @@
               return { data: null, error: { message: 'No existe la partida remota solicitada.' } };
             }
             const data = readGameData();
-            return {
+            const response = {
               data: { id: 'neo_main', updated_at: readJson(localStorage, GAME_STATE_KEY, {}).updated_at || '2026-11-20T00:00:00.000Z', data: clone(data) },
               error: null
             };
+            const deferred = nextDeferredGameStateRead;
+            if (deferred) {
+              nextDeferredGameStateRead = null;
+              deferred.started = true;
+              const result = await deferred.promise;
+              deferredGameStateReads.delete(deferred.id);
+              if (result.type === 'error') throw new Error(result.message);
+            }
+            return response;
           }
         };
       },
@@ -408,6 +437,11 @@
   window.MUSCULES_SUPABASE_TEST_ADAPTER = Object.freeze({
     createClient,
     getGameData: () => clone(readGameData()),
-    setGameData: data => writeGameData(clone(data))
+    setGameData: data => writeGameData(clone(data)),
+    deferNextGameStateRead,
+    isDeferredGameStateReadStarted: id => deferredGameStateReads.get(id)?.started || false,
+    resolveDeferredGameStateRead: id => finishDeferredGameStateRead(id, { type: 'success' }),
+    rejectDeferredGameStateRead: (id, message) =>
+      finishDeferredGameStateRead(id, { type: 'error', message })
   });
 })();
