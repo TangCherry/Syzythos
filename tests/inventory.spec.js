@@ -19,7 +19,7 @@ test('el inventario DM permite duplicados hasta 15 y bloquea la unidad 16', asyn
     .toEqual(Array(15).fill('cumbia'));
 });
 
-test('borrar una instancia de un objeto duplicado conserva la otra tras recargar', async ({ page }) => {
+test('Neo no puede retirar objetos y los cambios de Cherry persisten tras recargar', async ({ page, context }) => {
   await seedStorage(page, {
     local: {
       [INVENTORY_KEY]: ['cumbia', 'cumbia']
@@ -28,11 +28,15 @@ test('borrar una instancia de un objeto duplicado conserva la otra tras recargar
   await page.goto('/inventario.html');
 
   await page.getByRole('button', { name: 'Poción de la cumbia, espacio 1' }).click();
-  await page.locator('#item-delete').click();
-  await page.locator('#delete-confirm-yes').click();
-  await expect(page.locator('#item-dialog')).not.toBeVisible();
+  await expect(page.locator('#item-delete')).toBeHidden();
   expect(await page.evaluate(key => JSON.parse(localStorage.getItem(key)), INVENTORY_KEY))
-    .toEqual(['cumbia']);
+    .toEqual(['cumbia', 'cumbia']);
+
+  const dmPage = await context.newPage();
+  await dmPage.goto('/dm-inventario.html');
+  await dmPage.locator('#dm-remove-slot').selectOption('0');
+  await dmPage.locator('#dm-inventory-remove').click();
+  await expect(dmPage.locator('#dm-inventory-status')).toContainText('retirado');
 
   await page.reload();
   await expect(page.getByRole('button', { name: 'Poción de la cumbia, espacio 1' })).toBeVisible();

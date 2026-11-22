@@ -1,75 +1,68 @@
+import { readRemoteGameState, subscribeToGameState } from './supabase-client.js';
+
 (() => {
   'use strict';
 
-  const HERO_KEY = 'muscules_neo_stats_v01';
-  const XP_PER_LEVEL = 1000;
-  const DEFAULT_STATS = {
-    hp: 28,
-    maxHp: 28,
-    atk: 35,
-    xp: 9400,
-    weapon: 'Gancho',
-    sign: 'Sagitario',
-    levelName: 'Neogon'
-  };
   const $ = id => document.getElementById(id);
+  const statsPanel = document.querySelector('.stats');
+  const status = document.getElementById('profile-status');
+  let loading = false;
+  let lastUpdatedAt = null;
+  statsPanel.hidden = true;
 
-  function readStats() {
-    let stored;
-    try {
-      stored = JSON.parse(localStorage.getItem(HERO_KEY));
-    } catch {
-      stored = null;
-    }
-
-    if (!stored || typeof stored !== 'object' || Array.isArray(stored)) {
-      return { ...DEFAULT_STATS };
-    }
-
-    return {
-      ...stored,
-      ...Object.fromEntries(
-        Object.entries(DEFAULT_STATS).map(([key, fallback]) => [
-          key,
-          key in { hp: 1, maxHp: 1, atk: 1, xp: 1 }
-            ? Number.isFinite(stored[key]) ? stored[key] : fallback
-            : typeof stored[key] === 'string' ? stored[key] : fallback
-        ])
-      )
-    };
+  function showError(error) {
+    status.textContent = error.message || 'No se pudo cargar el perfil de Neo.';
+    status.hidden = false;
+    status.classList.add('is-error');
+    statsPanel.hidden = true;
   }
 
-  function render() {
-    const stats = readStats();
-    const hpMax = Math.max(0, stats.maxHp);
-    const hpCurrent = Math.max(0, stats.hp);
+  function render(stats) {
+    const hpMax = stats.maxHp;
+    const hpCurrent = stats.hp;
     const hpProgress = hpMax > 0 ? Math.min(1, hpCurrent / hpMax) : 0;
-    const totalXp = Math.max(0, stats.xp);
-    const level = Math.floor(totalXp / XP_PER_LEVEL);
-    const xpWithinLevel = totalXp % XP_PER_LEVEL;
-    const xpProgress = xpWithinLevel / XP_PER_LEVEL;
-    const hpMeter = $('hp-meter');
-    const xpMeter = $('xp-meter');
+    const totalXp = stats.xp;
+    const level = Math.floor(totalXp / 1000);
+    const xpWithinLevel = totalXp % 1000;
+    const xpProgress = xpWithinLevel / 1000;
 
-    hpMeter.setAttribute('aria-valuemax', String(hpMax));
-    hpMeter.setAttribute('aria-valuenow', String(Math.min(hpMax, hpCurrent)));
+    $('hp-meter').setAttribute('aria-valuemax', String(hpMax));
+    $('hp-meter').setAttribute('aria-valuenow', String(Math.min(hpMax, hpCurrent)));
     $('hp-fill').style.width = `${hpProgress * 100}%`;
-    $('hp-value').textContent = `${stats.hp}/${stats.maxHp}`;
-    $('atk-value').textContent = stats.atk;
-
-    xpMeter.setAttribute('aria-valuenow', String(xpWithinLevel));
-    xpMeter.setAttribute('aria-valuetext', `${stats.xp} XP acumulados`);
+    $('hp-value').textContent = `${hpCurrent}/${hpMax}`;
+    $('atk-value').textContent = String(stats.atk);
+    $('xp-meter').setAttribute('aria-valuenow', String(xpWithinLevel));
+    $('xp-meter').setAttribute('aria-valuetext', `${totalXp} XP acumulados`);
     $('xp-fill').style.width = `${xpProgress * 100}%`;
-    $('xp-value').textContent = `${new Intl.NumberFormat('es-MX').format(stats.xp)} XP`;
+    $('xp-value').textContent = `${new Intl.NumberFormat('es-MX').format(totalXp)} XP`;
     $('level-number').textContent = String(level);
-    $('weapon-value').textContent = stats.weapon;
-    $('sign-value').textContent = stats.sign;
-    $('level-name').textContent = stats.levelName;
+    $('weapon-value').textContent = stats.weapon || '—';
+    $('sign-value').textContent = stats.sign || '—';
+    $('level-name').textContent = stats.levelName || '—';
+    statsPanel.hidden = false;
+    status.hidden = true;
+    status.classList.remove('is-error');
   }
 
-  window.addEventListener('storage', event => {
-    if (event.key === HERO_KEY || event.key === null) render();
-  });
-  window.addEventListener('pageshow', render);
-  render();
+  async function refresh() {
+    if (loading || document.visibilityState === 'hidden') return;
+    loading = true;
+    try {
+      const remote = await readRemoteGameState();
+      if (remote.updated_at !== lastUpdatedAt) {
+        lastUpdatedAt = remote.updated_at;
+        render(remote.data.hero);
+      }
+    } catch (error) {
+      showError(error);
+    } finally {
+      loading = false;
+    }
+  }
+
+  refresh();
+  window.addEventListener('focus', refresh);
+  document.addEventListener('visibilitychange', refresh);
+  subscribeToGameState(refresh);
+  window.setInterval(refresh, 10000);
 })();

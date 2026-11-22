@@ -1,192 +1,155 @@
+import {
+  callGameRpc,
+  createRequestId,
+  readRemoteGameState,
+  subscribeToGameState
+} from './supabase-client.js';
+
 (() => {
   'use strict';
 
-  const INVENTORY_KEY = 'muscules_neo_inventory_v01';
-  const NOTIFICATIONS_KEY = 'muscules_neo_gift_notifications_v01';
-  const itemSelect = document.getElementById('dm-item');
-  const itemAbility = document.getElementById('dm-item-ability');
-  const messageInput = document.getElementById('dm-message');
-  const saveButton = document.getElementById('dm-inventory-save');
-  const status = document.getElementById('dm-inventory-status');
-  const itemById = new Map(ITEM_CATALOG.map(item => [item.id, item]));
-  let inventoryCount = 0;
-  let saving = false;
-  let writeBlockedReason = window.MusculesNeoStats?.supportsLock()
-    ? ''
-    : 'Web Locks no está disponible; no se pueden entregar objetos de forma segura.';
-  let writeBlocked = Boolean(writeBlockedReason);
+  const $ = id => document.getElementById(id);
+  const itemSelect = $('dm-item');
+  const itemAbility = $('dm-item-ability');
+  const messageInput = $('dm-message');
+  const saveButton = $('dm-inventory-save');
+  const removeSlot = $('dm-remove-slot');
+  const removeButton = $('dm-inventory-remove');
+  const status = $('dm-inventory-status');
+  const catalog = window.MUSCULES_ITEM_CATALOG;
+  const itemById = new Map((catalog || []).map(item => [item.id, item]));
+  let gameState = null;
+  let busy = false;
+  let loading = false;
 
-  if (!itemSelect || !itemAbility || !messageInput || !saveButton || !status) {
-    throw new Error('No se encontraron los controles del inventario DM.');
-  }
-  if (!window.MusculesNeoStats) {
-    throw new Error('No se pudo cargar el bloqueo compartido para el inventario.');
+  if (!Array.isArray(catalog)) throw new Error('No se pudo cargar el catálogo de objetos.');
+
+  function showStatus(message, isError = false) {
+    status.textContent = message;
+    status.classList.toggle('is-error', isError);
   }
 
-  function readRaw(key) {
+  function renderInventory({ quiet = false } = {}) {
+    const inventory = gameState?.inventory || [];
+    const full = inventory.length >= 15;
+    saveButton.disabled = busy || loading || !gameState || full
+      || !itemById.has(itemSelect.value) || messageInput.value.length > 100;
+    saveButton.textContent = busy ? 'Guardando…' : full ? 'Inventario lleno' : 'Guardar';
+    removeSlot.replaceChildren();
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = inventory.length ? 'Seleccionar objeto' : 'El inventario está vacío';
+    placeholder.selected = true;
+    removeSlot.append(placeholder);
+    inventory.forEach((id, index) => {
+      const option = document.createElement('option');
+      option.value = String(index);
+      option.textContent = `${itemById.get(id)?.name || id} · espacio ${index + 1}`;
+      removeSlot.append(option);
+    });
+    removeSlot.disabled = busy || loading || inventory.length === 0;
+    removeButton.disabled = busy || loading || !gameState || inventory.length === 0;
+    removeButton.textContent = busy ? 'Guardando…' : 'Retirar';
+    if (!quiet) showStatus(`Objetos: ${inventory.length}/15`);
+  }
+
+  async function refresh({ quiet = false, force = false } = {}) {
+    if (loading || (busy && !force) || document.visibilityState === 'hidden') return;
+    loading = true;
+    renderInventory({ quiet: true });
     try {
-      return localStorage.getItem(key);
+      const remote = await readRemoteGameState();
+      const changed = !gameState || remote.data.revision !== gameState.revision;
+      gameState = remote.data;
+      renderInventory({ quiet: quiet && !changed });
+      if (changed && quiet) showStatus(`Inventario actualizado: ${gameState.inventory.length}/15.`);
     } catch (error) {
-      throw new Error('No se pudo leer el almacenamiento local de Neo.', { cause: error });
+      gameState = null;
+      renderInventory({ quiet: true });
+      showStatus(error.message || 'No se pudo cargar el inventario remoto.', true);
+    } finally {
+      loading = false;
+      renderInventory({ quiet: true });
     }
   }
 
-  function parseArray(raw, key) {
-    if (raw === null) return [];
-    let value;
+  async function perform(action, args, successMessage) {
+    if (busy || !gameState) return;
+    busy = true;
+    renderInventory({ quiet: true });
+    showStatus('Guardando inventario en Supabase…');
     try {
-      value = JSON.parse(raw);
+      const response = await callGameRpc(action, {
+        ...args,
+        p_expected_revision: gameState.revision,
+        p_request_id: createRequestId()
+      });
+      gameState = response.data;
+      renderInventory({ quiet: true });
+      showStatus(successMessage);
     } catch (error) {
-      throw new Error(`Los datos guardados en ${key} no tienen JSON válido.`, { cause: error });
-    }
-    if (!Array.isArray(value)) throw new Error(`Los datos guardados en ${key} tienen un formato inválido.`);
-    return value;
-  }
-
-  function readInventory(raw = readRaw(INVENTORY_KEY)) {
-    const inventory = parseArray(raw, INVENTORY_KEY);
-    if (inventory.length > 15 || inventory.some(id => !itemById.has(id))) {
-      throw new Error('El inventario guardado contiene datos inválidos; no se modificó.');
-    }
-    return inventory;
-  }
-
-  function readNotifications(raw = readRaw(NOTIFICATIONS_KEY)) {
-    const notifications = parseArray(raw, NOTIFICATIONS_KEY);
-    const ids = new Set();
-    for (const notification of notifications) {
-      if (!notification || typeof notification.id !== 'string' || ids.has(notification.id)
-        || !itemById.has(notification.itemId) || typeof notification.message !== 'string'
-        || notification.message.length > 100 || typeof notification.seen !== 'boolean') {
-        throw new Error('La cola de regalos guardada es inválida; no se modificó.');
+      if (error.code === '40001') {
+        await refresh({ quiet: true, force: true });
+        showStatus(`${error.message} Revisa el inventario actualizado antes de volver a intentarlo.`, true);
+      } else {
+        showStatus(error.message || 'No se pudo actualizar el inventario.', true);
       }
-      ids.add(notification.id);
-    }
-    return notifications;
-  }
-
-  function restoreRaw(key, raw) {
-    if (raw === null) localStorage.removeItem(key);
-    else localStorage.setItem(key, raw);
-  }
-
-  function updateSaveState() {
-    const ready = Boolean(itemById.has(itemSelect.value)) && inventoryCount < 15 && !saving && !writeBlocked;
-    saveButton.disabled = !ready;
-    saveButton.classList.toggle('is-dirty', ready);
-    saveButton.textContent = inventoryCount >= 15 ? 'Inventario lleno' : saving ? 'Entregando…' : 'Guardar';
-  }
-
-  function updateInventoryCount() {
-    try {
-      inventoryCount = readInventory().length;
-      status.textContent = `Espacios ocupados: ${inventoryCount}/15`;
-      status.classList.remove('is-error');
-      if (writeBlocked) {
-        status.textContent = writeBlockedReason;
-        status.classList.add('is-error');
-        saveButton.disabled = true;
-        return;
-      }
-      updateSaveState();
-    } catch (error) {
-      status.textContent = error.message;
-      status.classList.add('is-error');
-      saveButton.disabled = true;
+    } finally {
+      busy = false;
+      renderInventory({ quiet: true });
     }
   }
 
-  for (const item of ITEM_CATALOG) {
-    if (typeof item.ability !== 'string' || !item.ability) {
-      throw new Error(`Falta la habilidad del objeto "${item.name}".`);
-    }
+  for (const item of catalog) {
     const option = document.createElement('option');
     option.value = item.id;
     option.textContent = item.name;
     itemSelect.append(option);
   }
-
   itemSelect.addEventListener('change', () => {
-    const selectedItem = itemById.get(itemSelect.value);
-    itemAbility.textContent = selectedItem?.ability ?? 'Selecciona un objeto para ver su habilidad.';
-    updateSaveState();
+    const item = itemById.get(itemSelect.value);
+    itemAbility.textContent = item?.ability ?? 'Selecciona un objeto para ver su habilidad.';
+    renderInventory({ quiet: true });
   });
-  messageInput.addEventListener('input', updateSaveState);
-
-  saveButton.addEventListener('click', async () => {
-    if (saving || saveButton.disabled) return;
+  messageInput.addEventListener('input', () => {
+    renderInventory({ quiet: true });
+  });
+  saveButton.addEventListener('click', () => {
     const item = itemById.get(itemSelect.value);
     if (!item || messageInput.value.length > 100) return;
-    saving = true;
-    status.classList.remove('is-error');
-    status.textContent = 'Entregando objeto…';
-    updateSaveState();
-    try {
-      if (!window.MusculesNeoStats.supportsLock()) {
-        throw new Error('Web Locks no está disponible; no se entregó el objeto.');
-      }
-      await window.MusculesNeoStats.withLock(() => {
-        const inventoryRaw = readRaw(INVENTORY_KEY);
-        const notificationsRaw = readRaw(NOTIFICATIONS_KEY);
-        const inventory = readInventory(inventoryRaw);
-        const notifications = readNotifications(notificationsRaw);
-        if (inventory.length >= 15) throw new Error('El inventario está lleno; no se entregó el objeto.');
-
-        const nextInventory = [...inventory, item.id];
-        const nextNotifications = [...notifications, {
-          id: globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-          itemId: item.id,
-          message: messageInput.value,
-          seen: false
-        }];
-        try {
-          localStorage.setItem(INVENTORY_KEY, JSON.stringify(nextInventory));
-          localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(nextNotifications));
-        } catch (error) {
-          let rollbackError;
-          for (const [key, raw] of [[INVENTORY_KEY, inventoryRaw], [NOTIFICATIONS_KEY, notificationsRaw]]) {
-            try {
-              restoreRaw(key, raw);
-            } catch (failure) {
-              rollbackError ??= failure;
-            }
-          }
-          if (rollbackError) {
-            console.error('Falló la reversión de una entrega de regalo.', rollbackError);
-            writeBlockedReason = 'No se confirmó la reversión de una entrega; revisa el almacenamiento antes de intentar más cambios.';
-            writeBlocked = true;
-            throw new Error(writeBlockedReason, { cause: error });
-          }
-          throw new Error('No se pudo guardar el regalo; los datos anteriores fueron restaurados.', { cause: error });
-        }
-      });
-
+    const message = messageInput.value.trim();
+    void perform(
+      'dm_grant_item',
+      { p_item_id: item.id },
+      message
+        ? `${item.name} entregado. Las notas de regalo aún no se sincronizan con el servidor.`
+        : `${item.name} entregado a Neo.`
+    ).then(() => {
+      if (status.classList.contains('is-error')) return;
       itemSelect.value = '';
       messageInput.value = '';
       itemAbility.textContent = 'Selecciona un objeto para ver su habilidad.';
-      status.textContent = `${item.name} entregado a Neo.`;
-      inventoryCount = readInventory().length;
-    } catch (error) {
-      console.error('No se pudo entregar el regalo.', error);
-      status.textContent = error.message || 'No se pudo entregar el objeto.';
-      status.classList.add('is-error');
-      try {
-        inventoryCount = readInventory().length;
-      } catch (readError) {
-        writeBlocked = true;
-        status.textContent = `${status.textContent} ${readError.message}`;
-      }
-    } finally {
-      saving = false;
-      updateSaveState();
-    }
+      renderInventory({ quiet: true });
+    });
+  });
+  removeButton.addEventListener('click', () => {
+    if (removeSlot.value === '') return;
+    const slot = Number(removeSlot.value);
+    if (!Number.isSafeInteger(slot) || slot < 0) return;
+    const item = gameState?.inventory[slot];
+    if (!item) return;
+    void perform(
+      'dm_remove_item',
+      { p_slot: slot },
+      `${itemById.get(item)?.name || item} retirado del inventario de Neo.`
+    );
   });
 
-  window.addEventListener('storage', event => {
-    if (event.key === INVENTORY_KEY || event.key === null) updateInventoryCount();
-  });
-  updateInventoryCount();
-  if (writeBlocked) {
-    status.textContent = writeBlockedReason;
-  }
+  window.addEventListener('focus', () => refresh({ quiet: true }));
+  document.addEventListener('visibilitychange', () => refresh({ quiet: true }));
+  subscribeToGameState(() => refresh({ quiet: true }));
+  window.setInterval(() => refresh({ quiet: true }), 10000);
+  saveButton.disabled = true;
+  removeButton.disabled = true;
+  refresh();
 })();

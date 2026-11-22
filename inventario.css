@@ -295,6 +295,10 @@ dialog::backdrop {
     cursor: pointer
 }
 
+.delete-item[hidden] {
+    display: none
+}
+
 .delete-item:hover,
 .delete-item:focus-visible {
     background: linear-gradient(#bd4c3f, #8b2b24);

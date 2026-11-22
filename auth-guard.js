@@ -59,9 +59,9 @@ try {
   const session = await getCurrentSession();
   if (!session) {
     location.replace(loginUrl());
-  } else if (requiredRole === 'dm') {
+  } else if (requiredRole === 'dm' || requiredRole === 'player') {
     const role = await getUserRole(session.user?.id);
-    if (role !== 'dm') {
+    if (role !== requiredRole) {
       location.replace(loginUrl('role'));
     } else {
       body.dataset.authReady = 'true';

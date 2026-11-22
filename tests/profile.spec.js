@@ -1,10 +1,22 @@
 const { test, expect } = require('@playwright/test');
-const { STATS_KEY, seedStorage, stats } = require('./support');
+const { REMOTE_STATE_KEY, STATS_KEY, seedStorage, stats } = require('./support');
 
 test('un cambio de perfil DM se refleja en Neo desde otra pestaña', async ({ page, context }) => {
   await seedStorage(page, {
     local: {
-      [STATS_KEY]: stats()
+      [REMOTE_STATE_KEY]: {
+        id: 'neo_main',
+        updated_at: '2026-11-20T00:00:00.000Z',
+        data: {
+          schemaVersion: 1,
+          revision: 0,
+          hero: stats(),
+          inventory: [],
+          currentEncounter: null,
+          battles: {}
+        }
+      },
+      [STATS_KEY]: stats({ hp: 1, atk: 99, xp: 1 })
     }
   });
   await page.goto('/perfil.html');

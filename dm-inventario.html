@@ -36,12 +36,16 @@
         <span id="dm-message-limit" class="dm-message-limit">Máximo 100 caracteres</span>
         <p id="dm-inventory-status" class="dm-inventory-status" role="status" aria-live="polite"></p>
         <button id="dm-inventory-save" class="dm-save dm-inventory-save" type="button" disabled>Guardar · Pendiente</button>
+        <label class="dm-label" for="dm-remove-slot">Retirar objeto</label>
+        <select id="dm-remove-slot" disabled>
+          <option value="" selected>El inventario está vacío</option>
+        </select>
+        <button id="dm-inventory-remove" class="dm-save" type="button" disabled>Retirar</button>
       </div>
     </section>
   </main>
-  <script src="neo-stats-lock.js"></script>
   <script src="inventory-data.js"></script>
-  <script src="dm-inventario.js"></script>
+  <script type="module" src="dm-inventario.js"></script>
   <script type="module" src="auth-guard.js"></script>
 </body>
 </html>

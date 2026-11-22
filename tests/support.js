@@ -1,5 +1,6 @@
 const STATS_KEY = 'muscules_neo_stats_v01';
 const INVENTORY_KEY = 'muscules_neo_inventory_v01';
+const REMOTE_STATE_KEY = 'muscules_playwright_remote_game_state';
 const NOTIFICATIONS_KEY = 'muscules_neo_gift_notifications_v01';
 const POINTER_KEY = 'muscules_dynamic_current_encounter_v01';
 const BATTLE_PREFIX = 'muscules_dynamic_battle_v02_';
@@ -7,7 +8,7 @@ const DEFAULT_STATS = {
   hp: 28,
   maxHp: 28,
   atk: 35,
-  xp: 9400,
+  xp: 9750,
   weapon: 'Gancho',
   sign: 'Sagitario',
   levelName: 'Neogon'
@@ -81,6 +82,7 @@ module.exports = {
   INVENTORY_KEY,
   NOTIFICATIONS_KEY,
   POINTER_KEY,
+  REMOTE_STATE_KEY,
   STATS_KEY,
   battle,
   pointer,

@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="auth.css" />
   <script src="supabase-config.js"></script>
 </head>
-<body data-auth-required="session">
+<body data-auth-required="player">
   <main class="profile-screen" aria-label="Perfil de Neo">
     <div class="profile-frame">
       <img class="star top-left" src="assets/sparkle.png" alt="" />
@@ -30,9 +30,10 @@
         <div class="stat-row stat-row--atk"><span class="stat-label">ATK</span><span id="atk-value"></span></div>
         <dl class="details"><div><dt>Arma:</dt><dd id="weapon-value">Gancho</dd></div><div><dt>Signo:</dt><dd id="sign-value">Sagitario</dd></div><div><dt>Nivel:</dt><dd><span id="level-number">9</span> · <span id="level-name">Neogon</span></dd></div></dl>
       </section>
+      <p id="profile-status" role="status" aria-live="polite" hidden></p>
     </div>
   </main>
-  <script src="perfil.js"></script>
+  <script type="module" src="perfil.js"></script>
   <script type="module" src="auth-guard.js"></script>
 </body>
 </html>

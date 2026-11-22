@@ -10,7 +10,7 @@
   <script src="supabase-config.js"></script>
 </head>
 
-<body data-auth-required="session">
+<body data-auth-required="player">
   <main class="game game--player" id="game">
     <img class="corner tl" src="assets/combate/chispa.png" alt=""><img class="corner tr" src="assets/combate/chispa.png"
       alt=""><img class="corner bl" src="assets/combate/chispa.png" alt=""><img class="corner br"
@@ -42,11 +42,18 @@
         </div>
         <p class="ability"><strong>Habilidad</strong><span id="enemy-ability">Tus ataques hacen −3 de daño</span></p>
         <p id="dm-message" class="dm-message" hidden></p>
-        <div class="hero-stats"><span id="hero-title">Neogon</span><span id="hero-hp">28/28 HP</span></div>
-        <div class="hero-track">
-          <div id="hero-bar"></div>
+        <div class="hero-health">
+          <div class="hero-stats">
+            <span data-hero-title>Neo · Neogon</span>
+            <span id="hero-hp" data-hero-hp-value>28/28 HP</span>
+          </div>
+          <div class="hero-track" data-hero-hp-track role="progressbar" aria-label="HP de Neo"
+            aria-valuemin="0" aria-valuemax="28" aria-valuenow="28" aria-valuetext="28 de 28 HP">
+            <div id="hero-bar" data-hero-hp-fill aria-hidden="true"></div>
+          </div>
         </div>
         <p class="log" id="log" role="status">¡Carrotñero te desafía! Neo ataca primero.</p>
+        <p class="counterattack-log" data-counterattack-message role="status" aria-live="polite"></p>
         <div class="battle-actions">        <button class="action" id="roll">🎲 Tirar dado</button><button id="inventory-toggle"
           class="inventory-toggle" aria-label="Abrir inventario" title="Inventario"><img
             src="assets/items/inventory-button.png" alt=""></button></div>
@@ -56,19 +63,42 @@
     <section id="win" class="scene scene--result win" hidden>
       <h1>¡Victoria!</h1><img class="result-monster" id="win-image" src="assets/combate/carrotnero.png"
         alt="Enemigo derrotado">
+      <div class="hero-health hero-health--result">
+        <div class="hero-stats">
+          <span data-hero-title>Neo · Neogon</span>
+          <span data-hero-hp-value>28/28 HP</span>
+        </div>
+        <div class="hero-track" data-hero-hp-track role="progressbar" aria-label="HP de Neo"
+          aria-valuemin="0" aria-valuemax="28" aria-valuenow="28" aria-valuetext="28 de 28 HP">
+          <div data-hero-hp-fill aria-hidden="true"></div>
+        </div>
+      </div>
       <div class="result-copy">
         <p>Recompensa</p>
         <p id="reward-xp">30 XP</p><button id="claim" class="claim" type="button">Reclamar</button>
         <p class="result-status" id="claim-status"></p>
+        <p class="counterattack-log" data-counterattack-message role="status" aria-live="polite"></p>
       </div>
       <div id="win-picker-container"></div>
       <a href="index.html" class="result-exit">Salir</a>
     </section>
     <section id="lose" class="scene scene--result lose" hidden>
       <h1>Derrota</h1><img class="result-monster" id="lose-image" src="assets/combate/carrotnero.png" alt="Enemigo">
+      <div class="hero-health hero-health--result">
+        <div class="hero-stats">
+          <span data-hero-title>Neo · Neogon</span>
+          <span data-hero-hp-value>28/28 HP</span>
+        </div>
+        <div class="hero-track" data-hero-hp-track role="progressbar" aria-label="HP de Neo"
+          aria-valuemin="0" aria-valuemax="28" aria-valuenow="28" aria-valuetext="28 de 28 HP">
+          <div data-hero-hp-fill aria-hidden="true"></div>
+        </div>
+      </div>
       <div class="result-copy">
         <p id="lose-reason">Fallecido</p>
-        <p id="lose-detail">Sin penalización de XP</p><button id="revive-button" class="action" hidden>❤️ Usar
+        <p id="lose-detail">Sin penalización de XP</p>
+        <p class="counterattack-log" data-counterattack-message role="status" aria-live="polite"></p>
+        <button id="revive-button" class="action" hidden>❤️ Usar
           resurrección</button><a class="result-exit" href="index.html">Salir</a>
       </div>
       <div id="lose-picker-container"></div>
@@ -88,9 +118,9 @@
       </div>
     </div>
   </main>
-  <script src="neo-stats-lock.js" defer></script>
   <script src="enemies.js" defer></script>
-  <script src="combate.js" defer></script>
+  <script src="inventory-data.js" defer></script>
+  <script type="module" src="combate-remote.js"></script>
   <script type="module" src="auth-guard.js"></script>
 </body>
 

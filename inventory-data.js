@@ -17,3 +17,4 @@ const ITEM_CATALOG = [
   { id: "miau", name: "¿Miau?", icon: "assets/items/¿miau?.png", card: "assets/cards/¿miau?.png", ability: "Pochito, te hirieron" },
   { id: "vida_extra", name: "Vida extra", icon: "assets/items/vida-extra.png", card: "assets/cards/vida-extra.png", ability: "Te lo presto pero, sólo porque no lo uso" }
 ];
+window.MUSCULES_ITEM_CATALOG = ITEM_CATALOG;

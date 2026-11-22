@@ -1,5 +1,11 @@
 const { test, expect } = require('@playwright/test');
-const { BATTLE_PREFIX, INVENTORY_KEY, POINTER_KEY, battle, seedStorage } = require('./support');
+const {
+  BATTLE_PREFIX,
+  INVENTORY_KEY,
+  POINTER_KEY,
+  battle,
+  seedStorage
+} = require('./support');
 
 async function activate(page, enemyId) {
   const previousLink = await page.locator('#dm-encounter-url').inputValue();
@@ -26,10 +32,12 @@ test('un encuentro vencido produce derrota sin esperar 24 horas', async ({ page 
   await page.goto('/dm-encuentro.html');
   const link = await activate(page, 'carrotnero');
   await page.evaluate(() => {
-    const key = 'muscules_dynamic_current_encounter_v01';
-    const encounter = JSON.parse(localStorage.getItem(key));
+    const adapter = window.MUSCULES_SUPABASE_TEST_ADAPTER;
+    const data = adapter.getGameData();
+    const encounter = data.currentEncounter;
     encounter.expiresAt = Date.now() - 1000;
-    localStorage.setItem(key, JSON.stringify(encounter));
+    data.battles[encounter.encounterId].expiresAt = encounter.expiresAt;
+    adapter.setGameData(data);
   });
 
   const url = new URL(link);
@@ -38,7 +46,7 @@ test('un encuentro vencido produce derrota sin esperar 24 horas', async ({ page 
   await expect(page.locator('#lose-reason')).toHaveText('Tiempo agotado');
 });
 
-test('reemplazar un encuentro con recompensa pendiente la descarta sin reclamarla', async ({ page }) => {
+test('un encuentro reemplazado conserva su recompensa pendiente y permite reclamarla', async ({ page }) => {
   const enemyId = 'pescado';
   const encounterId = 'pending-reward-replacement';
   const currentPointer = {
@@ -58,8 +66,18 @@ test('reemplazar un encuentro con recompensa pendiente la descarta sin reclamarl
   await page.goto('/dm-encuentro.html');
   await activate(page, 'buho');
 
-  const storedBattle = await page.evaluate(key => JSON.parse(localStorage.getItem(key)), BATTLE_PREFIX + enemyId);
-  expect(storedBattle.rewardDiscarded).toBe(true);
+  const storedBattle = await page.evaluate(() => {
+    const data = window.MUSCULES_SUPABASE_TEST_ADAPTER.getGameData();
+    return data.battles['pending-reward-replacement'];
+  });
   expect(storedBattle.claimed).toBe(false);
   expect(await page.evaluate(key => JSON.parse(localStorage.getItem(key)), INVENTORY_KEY)).toEqual([]);
+
+  await page.goto(`/combate.html?encounter=${encodeURIComponent(encounterId)}`);
+  await expect(page.locator('#win')).toBeVisible();
+  await page.locator('#claim').click();
+  await expect(page.locator('#claim')).toBeDisabled();
+  expect(await page.evaluate(() =>
+    window.MUSCULES_SUPABASE_TEST_ADAPTER.getGameData().inventory
+  )).toEqual(['cumbia']);
 });
